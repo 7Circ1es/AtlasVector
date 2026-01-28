@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atlas Vector</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px 0;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.95;
+        }
+        
+        .canvas-container {
+            background: white;
+            border-radius: 0;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            position: relative;
+            min-height: 525px;
+            overflow-x: auto;
+            overflow-y: visible;
+            width: 100%;
+            max-width: 980px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        
+        .svg-wrapper {
+            min-width: 450px;
+            width: 450px;
+            transform-origin: center center;
+            transition: transform 0.1s ease-out;
+            margin: 0 auto;
+        }
+        
+        .canvas-container.zooming .svg-wrapper {
+            transition: none;
+        }
+        
+        svg {
+            width: 450px;
+            height: 525px;
+            display: block;
+        }
+        
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .node:hover circle {
+            filter: brightness(1.1);
+            transform: scale(1.05);
+        }
+        
+        .node circle {
+            transition: all 0.3s ease;
+        }
+        
+        .node.selected circle {
+            stroke: #ff6b6b;
+            stroke-width: 4;
+        }
+        
+        .node text {
+            pointer-events: none;
+            font-weight: 600;
+        }
+        
+        .connection {
+            stroke: #cbd5e0;
+            stroke-width: 2;
+            fill: none;
+            opacity: 0.6;
+        }
+        
+        .center-node circle {
+            fill: #eab308;
+        }
+        
+        .pdr-node circle {
+            fill: #1e3a8a;
+        }
+        
+        .pdr-supplies-node circle {
+            fill: #1e3a8a;
+        }
+        
+        .ai-software-node circle {
+            fill: #8b4029;
+        }
+        
+        .vehicle-node circle {
+            fill: #991b1b;
+        }
+        
+        .financial-node circle {
+            fill: #16a34a;
+        }
+        
+        .hybrid-node circle {
+            fill: #8b4029;
+        }
+        
+        .retail-node circle {
+            fill: #7c2d12;
+        }
+        
+        .residential-node circle {
+            fill: #65512e;
+        }
+        
+        .tech-node circle {
+            fill: #44403c;
+        }
+        
+        .vacation-node circle {
+            fill: #4d5e3d;
+        }
+        
+        .detail-panel {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: white;
+            z-index: 1000;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.4s ease;
+        }
+        
+        .detail-panel.open {
+            transform: translateX(0);
+        }
+        
+        .detail-content {
+            padding: 30px;
+        }
+        
+        .detail-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 3px solid #667eea;
+        }
+        
+        .detail-header h2 {
+            color: #667eea;
+            font-size: 1.8em;
+        }
+        
+        .close-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            width: 35px;
+            height: 35px;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+        
+        .close-btn:hover {
+            background: #764ba2;
+            transform: rotate(90deg);
+        }
+        
+        .detail-section {
+            margin-bottom: 25px;
+        }
+        
+        .detail-section h3 {
+            color: #2d3748;
+            font-size: 1.2em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: text;
+            padding: 8px;
+            border-radius: 4px;
+            transition: background 0.2s ease;
+        }
+        
+        .detail-section h3:hover {
+            background: #f7fafc;
+        }
+        
+        .detail-section h3:focus {
+            outline: 2px solid #667eea;
+            background: white;
+        }
+        
+        .detail-section h3::before {
+            content: '▸';
+            color: #667eea;
+            font-size: 1.2em;
+        }
+        
+        .editable-content {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 15px;
+            min-height: 250px;
+            cursor: text;
+            transition: all 0.3s ease;
+            white-space: pre-wrap;
+            line-height: 1.6;
+        }
+        
+        .editable-content.short {
+            min-height: 60px;
+        }
+        
+        .editable-content:hover {
+            border-color: #667eea;
+            background: #edf2f7;
+        }
+        
+        .editable-content:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        .editable-content.empty::before {
+            content: 'Click to add details...';
+            color: #a0aec0;
+            font-style: italic;
+        }
+        
+        .save-indicator {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: #48bb78;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            box-shadow: 0 4px 15px rgba(72, 187, 120, 0.4);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            font-weight: 600;
+        }
+        
+        .save-indicator.show {
+            opacity: 1;
+        }
+        
+        .instructions {
+            background: #edf2f7;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            border-left: 5px solid #667eea;
+            width: 100%;
+        }
+        
+        .instructions p {
+            color: #2d3748;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+        
+        .instructions strong {
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Atlas Vector</h1>
+            <p>Click any option to explore details</p>
+        </div>
+        
+        <div class="canvas-container">
+            <div class="instructions">
+                <p><strong>💡 How to use:</strong> Click on any colored circle to view and edit details about that career option.</p>
+                <p><strong>✏️ Edit mode:</strong> Click on any text area in the side panel to add your thoughts, steps, resources, or notes.</p>
+                <p><strong>💾 Auto-save:</strong> Your changes are automatically saved in your browser.</p>
+            </div>
+            
+            <div class="svg-wrapper">
+                <svg id="flowchart"></svg>
+            </div>
+        </div>
+    </div>
+    
+    <div class="detail-panel" id="detailPanel">
+        <div class="detail-content">
+            <div class="detail-header">
+                <h2 id="detailTitle">Option Details</h2>
+                <button class="close-btn" onclick="closePanel()">×</button>
+            </div>
+            
+            <div class="detail-section">
+                <h3 contenteditable="true" data-field="heading_marketResearch" id="heading_marketResearch">Market Research</h3>
+                <div class="editable-content" contenteditable="true" data-field="marketResearch" id="marketResearch"></div>
+            </div>
+            
+            <div class="detail-section">
+                <h3 contenteditable="true" data-field="heading_operatingMargins" id="heading_operatingMargins">Operating Margins</h3>
+                <div class="editable-content short" contenteditable="true" data-field="operatingMargins" id="operatingMargins"></div>
+            </div>
+            
+            <div class="detail-section">
+                <h3 contenteditable="true" data-field="heading_cashFlowMargins" id="heading_cashFlowMargins">Cash Flow Margins</h3>
+                <div class="editable-content short" contenteditable="true" data-field="cashFlowMargins" id="cashFlowMargins"></div>
+            </div>
+            
+            <div class="detail-section">
+                <h3 contenteditable="true" data-field="heading_initialInvestment" id="heading_initialInvestment">Initial Investment</h3>
+                <div class="editable-content short" contenteditable="true" data-field="initialInvestment" id="initialInvestment"></div>
+            </div>
+            
+            <div class="detail-section">
+                <h3 contenteditable="true" data-field="heading_educationNeeded" id="heading_educationNeeded">Education Needed</h3>
+                <div class="editable-content short" contenteditable="true" data-field="educationNeeded" id="educationNeeded"></div>
+            </div>
+            
+            <div class="detail-section">
+                <h3 contenteditable="true" data-field="heading_personalInterest" id="heading_personalInterest">Personal Interest</h3>
+                <div class="editable-content short" contenteditable="true" data-field="personalInterest" id="personalInterest"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="save-indicator" id="saveIndicator">✓ Saved</div>
+    
+    <script>
+        const options = [
+            {
+                id: 'center',
+                label: '27 Years\nPDR Experience',
+                x: 200,
+                y: 150,
+                type: 'center'
+            },
+            {
+                id: 'pdr-supplies',
+                label: 'PDR Supplies\nShipping',
+                x: 75,
+                y: 40,
+                type: 'pdr'
+            },
+            {
+                id: 'hail',
+                label: 'Chase Hail\nStorms',
+                x: 150,
+                y: 75,
+                type: 'pdr'
+            },
+            {
+                id: 'local',
+                label: 'Work for Local\nPDR Shop',
+                x: 225,
+                y: 65,
+                type: 'pdr'
+            },
+            {
+                id: 'own-shop',
+                label: 'Start My Own\nPDR Shop',
+                x: 300,
+                y: 75,
+                type: 'pdr'
+            },
+            {
+                id: 'ai-software',
+                label: 'Create AI Software\nfor PDR Marketing',
+                x: 340,
+                y: 137.5,
+                type: 'ai-software'
+            },
+            {
+                id: 'campervans',
+                label: 'Build\nCampervans',
+                x: 75,
+                y: 240,
+                type: 'vehicle'
+            },
+            {
+                id: 'offroad',
+                label: 'Off-Road Rig\nInstalls',
+                x: 140,
+                y: 255,
+                type: 'vehicle'
+            },
+            {
+                id: 'rentals',
+                label: 'Overland\nRentals',
+                x: 210,
+                y: 255,
+                type: 'vehicle'
+            },
+            {
+                id: 'tours',
+                label: 'Overland\nGuided Tours',
+                x: 280,
+                y: 240,
+                type: 'vehicle'
+            },
+            {
+                id: 'investing',
+                label: 'Learn to Invest\nProfessionally',
+                x: 50,
+                y: 150,
+                type: 'financial'
+            },
+            {
+                id: 'trip-app',
+                label: 'Overland\nTrip-Planning App',
+                x: 340,
+                y: 200,
+                type: 'hybrid'
+            },
+            {
+                id: 'news-app',
+                label: 'Selective Sources\nRestrictive Time News App',
+                x: 400,
+                y: 167.5,
+                type: 'tech'
+            },
+            {
+                id: 'secondhand-gear',
+                label: '2nd Hand Overland\nGear Store',
+                x: 345,
+                y: 275,
+                type: 'retail'
+            },
+            {
+                id: 'rei-overland',
+                label: 'REI of\nOverlanding',
+                x: 180,
+                y: 325,
+                type: 'retail'
+            },
+            {
+                id: 'offgrid-residential',
+                label: 'Off-Grid Tech\nResidential',
+                x: 180,
+                y: 400,
+                type: 'residential'
+            },
+            {
+                id: 'offgrid-vacation',
+                label: 'Off-Grid\nVacation Rentals',
+                x: 200,
+                y: 465,
+                type: 'vacation'
+            }
+        ];
+        
+        const connections = [
+            { from: 'center', to: 'hail' },
+            { from: 'center', to: 'local' },
+            { from: 'center', to: 'own-shop' },
+            { from: 'center', to: 'ai-software' },
+            { from: 'center', to: 'pdr-supplies' },
+            { from: 'own-shop', to: 'ai-software', style: 'dashed' },
+            { from: 'own-shop', to: 'pdr-supplies', style: 'dashed' },
+            { from: 'center', to: 'campervans' },
+            { from: 'center', to: 'offroad' },
+            { from: 'offroad', to: 'rentals', style: 'dashed' },
+            { from: 'rentals', to: 'tours', style: 'dashed' },
+            { from: 'ai-software', to: 'trip-app', style: 'dashed' },
+            { from: 'ai-software', to: 'news-app', style: 'dashed' },
+            { from: 'trip-app', to: 'news-app', style: 'dashed' },
+            { from: 'trip-app', to: 'tours', style: 'dashed' },
+            { from: 'trip-app', to: 'rentals', style: 'dashed' },
+            { from: 'tours', to: 'secondhand-gear', style: 'dashed' },
+            { from: 'trip-app', to: 'secondhand-gear', style: 'dashed' },
+            { from: 'campervans', to: 'rei-overland', style: 'dashed' },
+            { from: 'offroad', to: 'rei-overland', style: 'dashed' },
+            { from: 'rentals', to: 'rei-overland', style: 'dashed' },
+            { from: 'tours', to: 'rei-overland', style: 'dashed' },
+            { from: 'rei-overland', to: 'offgrid-residential', style: 'dashed' },
+            { from: 'offgrid-residential', to: 'offgrid-vacation', style: 'dashed' }
+        ];
+        
+        let currentOption = null;
+        let data = {};
+        
+        // Load saved data
+        function loadData() {
+            const saved = localStorage.getItem('atlasVectorData');
+            if (saved) {
+                data = JSON.parse(saved);
+            }
+        }
+        
+        // Save data
+        function saveData() {
+            localStorage.setItem('atlasVectorData', JSON.stringify(data));
+            showSaveIndicator();
+        }
+        
+        function showSaveIndicator() {
+            const indicator = document.getElementById('saveIndicator');
+            indicator.classList.add('show');
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 2000);
+        }
+        
+        // Draw the flowchart
+        function drawFlowchart() {
+            const svg = document.getElementById('flowchart');
+            
+            // Draw connections
+            connections.forEach(conn => {
+                const from = options.find(o => o.id === conn.from);
+                const to = options.find(o => o.id === conn.to);
+                
+                const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                const d = `M ${from.x} ${from.y} Q ${(from.x + to.x) / 2} ${(from.y + to.y) / 2} ${to.x} ${to.y}`;
+                line.setAttribute('d', d);
+                line.setAttribute('class', 'connection');
+                if (conn.style === 'dashed') {
+                    line.setAttribute('stroke-dasharray', '5,5');
+                }
+                svg.appendChild(line);
+            });
+            
+            // Draw nodes
+            options.forEach(option => {
+                const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                g.setAttribute('class', `node ${option.type}-node`);
+                g.setAttribute('data-id', option.id);
+                
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', option.x);
+                circle.setAttribute('cy', option.y);
+                circle.setAttribute('r', option.type === 'center' ? 35 : 30);
+                g.appendChild(circle);
+                
+                const lines = option.label.split('\n');
+                lines.forEach((line, i) => {
+                    const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+                    text.setAttribute('x', option.x);
+                    text.setAttribute('y', option.y + (i - lines.length / 2 + 0.7) * 9);
+                    text.setAttribute('text-anchor', 'middle');
+                    text.setAttribute('fill', 'white');
+                    text.setAttribute('font-size', option.type === 'center' ? '7' : '6.5');
+                    text.textContent = line;
+                    g.appendChild(text);
+                });
+                
+                g.addEventListener('click', () => openPanel(option.id));
+                svg.appendChild(g);
+            });
+        }
+        
+        function openPanel(optionId) {
+            currentOption = optionId;
+            const option = options.find(o => o.id === optionId);
+            
+            // Update selected state
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+            document.querySelector(`[data-id="${optionId}"]`).classList.add('selected');
+            
+            // Update panel title
+            document.getElementById('detailTitle').textContent = option.label.replace('\n', ' ');
+            
+            // Load data for this option
+            const optionData = data[optionId] || {};
+            
+            // Load heading text
+            ['marketResearch', 'operatingMargins', 'cashFlowMargins', 'initialInvestment', 'educationNeeded', 'personalInterest'].forEach(field => {
+                const headingEl = document.getElementById(`heading_${field}`);
+                if (optionData[`heading_${field}`]) {
+                    headingEl.textContent = optionData[`heading_${field}`];
+                }
+            });
+            
+            // Load content
+            ['marketResearch', 'operatingMargins', 'cashFlowMargins', 'initialInvestment', 'educationNeeded', 'personalInterest'].forEach(field => {
+                const el = document.getElementById(field);
+                el.textContent = optionData[field] || '';
+                if (!optionData[field]) {
+                    el.classList.add('empty');
+                } else {
+                    el.classList.remove('empty');
+                }
+            });
+            
+            // Open panel
+            document.getElementById('detailPanel').classList.add('open');
+        }
+        
+        function closePanel() {
+            document.getElementById('detailPanel').classList.remove('open');
+            document.querySelectorAll('.node').forEach(n => n.classList.remove('selected'));
+            currentOption = null;
+        }
+        
+        // Auto-save on content change
+        document.querySelectorAll('.editable-content').forEach(el => {
+            el.addEventListener('input', function() {
+                if (!currentOption) return;
+                
+                const field = this.getAttribute('data-field');
+                
+                if (!data[currentOption]) {
+                    data[currentOption] = {};
+                }
+                
+                data[currentOption][field] = this.textContent;
+                
+                // Update empty class
+                if (this.textContent.trim() === '') {
+                    this.classList.add('empty');
+                } else {
+                    this.classList.remove('empty');
+                }
+                
+                saveData();
+            });
+        });
+        
+        // Initialize
+        loadData();
+        drawFlowchart();
+        
+        // Pinch-to-zoom functionality
+        let currentScale = 1;
+        let initialDistance = 0;
+        let isZooming = false;
+        
+        const svgWrapper = document.querySelector('.svg-wrapper');
+        const canvasContainer = document.querySelector('.canvas-container');
+        
+        function getDistance(touches) {
+            const dx = touches[0].clientX - touches[1].clientX;
+            const dy = touches[0].clientY - touches[1].clientY;
+            return Math.sqrt(dx * dx + dy * dy);
+        }
+        
+        canvasContainer.addEventListener('touchstart', function(e) {
+            if (e.touches.length === 2) {
+                e.preventDefault();
+                isZooming = true;
+                canvasContainer.classList.add('zooming');
+                initialDistance = getDistance(e.touches);
+            }
+        }, { passive: false });
+        
+        canvasContainer.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 2 && isZooming) {
+                e.preventDefault();
+                const currentDistance = getDistance(e.touches);
+                const scale = (currentDistance / initialDistance) * currentScale;
+                
+                // Limit zoom between 0.35x and 3x
+                const limitedScale = Math.min(Math.max(scale, 0.35), 3);
+                svgWrapper.style.transform = `scale(${limitedScale})`;
+            }
+        }, { passive: false });
+        
+        canvasContainer.addEventListener('touchend', function(e) {
+            if (e.touches.length < 2 && isZooming) {
+                isZooming = false;
+                canvasContainer.classList.remove('zooming');
+                
+                // Get the final scale from the transform
+                const transform = svgWrapper.style.transform;
+                const match = transform.match(/scale\(([^)]+)\)/);
+                if (match) {
+                    currentScale = parseFloat(match[1]);
+                }
+            }
+        });
+    </script>
+</body>
+</html>
