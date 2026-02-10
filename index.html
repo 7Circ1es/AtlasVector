@@ -871,11 +871,14 @@
             // Load metrics for this option
             loadMetrics(optionId);
             
-            // Save current zoom level and reset SVG zoom
+            // Save current zoom level and pan position, then reset
             const svg = document.getElementById('flowchart');
             if (svg) {
-                window.savedChartZoom = svg.style.transform || 'scale(1)';
-                svg.style.transform = 'scale(1)';
+                window.savedChartTransform = svg.style.transform || 'translate(0px, 0px) scale(1)';
+                window.savedScale = currentScale;
+                window.savedX = currentX;
+                window.savedY = currentY;
+                svg.style.transform = 'translate(0px, 0px) scale(1)';
             }
             
             // Hide the entire canvas container when panel is open
@@ -12045,10 +12048,13 @@
             const canvasContainer = document.querySelector('.canvas-container');
             canvasContainer.style.display = 'flex';
             
-            // Restore the saved chart zoom to SVG
+            // Restore the saved chart zoom and pan position
             const svg = document.getElementById('flowchart');
-            if (svg && window.savedChartZoom) {
-                svg.style.transform = window.savedChartZoom;
+            if (svg && window.savedChartTransform) {
+                svg.style.transform = window.savedChartTransform;
+                currentScale = window.savedScale || 1;
+                currentX = window.savedX || 0;
+                currentY = window.savedY || 0;
             }
         }
         
@@ -12082,13 +12088,26 @@
             lastTouchEnd = now;
         }, { passive: false });
         
-        // Pinch-to-zoom functionality (first layer only)
+        // Pinch-to-zoom and pan functionality (first layer only)
         let currentScale = 1;
+        let currentX = 0;
+        let currentY = 0;
         let initialDistance = 0;
+        let initialScale = 1; // Save scale at start of pinch
         let isZooming = false;
+        let isPanning = false;
+        let startX = 0;
+        let startY = 0;
+        let lastX = 0;
+        let lastY = 0;
         
         const canvasContainer = document.querySelector('.canvas-container');
         const svg = document.getElementById('flowchart');
+        
+        function updateTransform() {
+            svg.style.transform = `translate(${currentX}px, ${currentY}px) scale(${currentScale})`;
+            svg.style.transformOrigin = '0 0';
+        }
         
         function getDistance(touches) {
             const dx = touches[0].clientX - touches[1].clientX;
@@ -12100,34 +12119,50 @@
             if (e.touches.length === 2) {
                 e.preventDefault();
                 isZooming = true;
+                isPanning = false;
                 initialDistance = getDistance(e.touches);
+                initialScale = currentScale; // Save current scale at start of pinch
+            } else if (e.touches.length === 1 && currentScale > 1) {
+                // Start panning only if zoomed in
+                isPanning = true;
+                startX = e.touches[0].clientX - currentX;
+                startY = e.touches[0].clientY - currentY;
+                lastX = e.touches[0].clientX;
+                lastY = e.touches[0].clientY;
             }
         }, { passive: false });
         
         canvasContainer.addEventListener('touchmove', function(e) {
             if (e.touches.length === 2 && isZooming) {
                 e.preventDefault();
+                isPanning = false;
                 const currentDistance = getDistance(e.touches);
-                const scale = (currentDistance / initialDistance) * currentScale;
+                const scale = (currentDistance / initialDistance) * initialScale; // Use initialScale instead of currentScale
                 
                 // Limit zoom between 0.75x and 3x
-                const limitedScale = Math.min(Math.max(scale, 0.75), 3);
-                // Apply zoom to SVG
-                svg.style.transform = `scale(${limitedScale})`;
-                svg.style.transformOrigin = 'center center';
+                currentScale = Math.min(Math.max(scale, 0.75), 3);
+                
+                // Reset pan position when zooming back to 1x or less
+                if (currentScale <= 1) {
+                    currentX = 0;
+                    currentY = 0;
+                }
+                
+                updateTransform();
+            } else if (e.touches.length === 1 && isPanning && currentScale > 1) {
+                e.preventDefault();
+                currentX = e.touches[0].clientX - startX;
+                currentY = e.touches[0].clientY - startY;
+                updateTransform();
             }
         }, { passive: false });
         
         canvasContainer.addEventListener('touchend', function(e) {
             if (e.touches.length < 2 && isZooming) {
                 isZooming = false;
-                
-                // Get the final scale from the transform
-                const transform = svg.style.transform;
-                const match = transform.match(/scale\(([^)]+)\)/);
-                if (match) {
-                    currentScale = parseFloat(match[1]);
-                }
+            }
+            if (e.touches.length === 0) {
+                isPanning = false;
             }
         });
         
