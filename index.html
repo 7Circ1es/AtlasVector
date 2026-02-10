@@ -390,6 +390,153 @@
             opacity: 1;
         }
         
+        /* Comparison Feature Styles */
+        .compare-checkbox {
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+        }
+        
+        .compare-checkbox:active {
+            opacity: 1;
+        }
+        
+        .compare-checkbox.selected {
+            opacity: 1;
+        }
+        
+        .compare-checkbox.selected polygon {
+            fill: #7c3aed !important;
+        }
+        
+        .compare-controls {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: white;
+            padding: 15px 30px;
+            border-radius: 50px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            display: none;
+            gap: 20px;
+            align-items: center;
+            z-index: 999;
+        }
+        
+        .compare-controls.show {
+            display: flex;
+        }
+        
+        .compare-count {
+            font-size: 14px;
+            color: #718096;
+            font-weight: 600;
+        }
+        
+        .compare-btn {
+            background: #7c3aed;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .compare-btn:hover {
+            background: #6d28d9;
+            transform: scale(1.05);
+        }
+        
+        .clear-compare-btn {
+            background: #e5e7eb;
+            color: #374151;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .clear-compare-btn:hover {
+            background: #d1d5db;
+        }
+        
+        .comparison-panel {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 100vw;
+            height: 100vh;
+            background: white;
+            z-index: 2000;
+            overflow-y: auto;
+            transform: translateX(100%);
+            transition: transform 0.4s ease;
+            touch-action: pan-y;
+        }
+        
+        .comparison-panel.open {
+            transform: translateX(0);
+        }
+        
+        .comparison-content {
+            padding: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .comparison-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+        
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+            font-size: 14px;
+        }
+        
+        .comparison-table th {
+            background: #f7fafc;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #e5e7eb;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        .comparison-table td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+            vertical-align: top;
+        }
+        
+        .comparison-table tr:hover {
+            background: #f7fafc;
+        }
+        
+        .metric-row-label {
+            font-weight: 600;
+            color: #2d3748;
+        }
+        
+        .best-value {
+            background: #d4edda !important;
+            font-weight: 600;
+        }
+        
         .instructions {
             background: #edf2f7;
             padding: 9px;
@@ -419,9 +566,8 @@
         
         <div class="canvas-container">
             <div class="instructions">
-                <p><strong>💡 How to use:</strong> Click on any colored circle to view and edit details about that career option.</p>
-                <p><strong>✏️ Edit mode:</strong> Click on any text area in the side panel to add your thoughts, steps, resources, or notes.</p>
-                <p><strong>💾 Auto-save:</strong> Your changes are automatically saved in your browser.</p>
+                <p><strong>1.</strong> Click on any circle to view research data. Click again on any metric for additional info.</p>
+                <p><strong>2.</strong> Click on triangles to select and compare data from up to 5 options.</p>
             </div>
             
             <div class="svg-wrapper">
@@ -444,6 +590,24 @@
     </div>
     
     <div class="save-indicator" id="saveIndicator">✓ Saved</div>
+    
+    <!-- Comparison Controls -->
+    <div class="compare-controls" id="compareControls">
+        <span class="compare-count" id="compareCount">0 selected</span>
+        <button class="compare-btn" onclick="showComparison()">Compare Selected</button>
+        <button class="clear-compare-btn" onclick="clearSelection()">Clear</button>
+    </div>
+    
+    <!-- Comparison Panel -->
+    <div class="comparison-panel" id="comparisonPanel">
+        <div class="comparison-content">
+            <div class="comparison-header">
+                <h2 id="comparisonTitle">Business Comparison</h2>
+                <button class="close-btn" onclick="closeComparison()">×</button>
+            </div>
+            <div id="comparisonTableContainer"></div>
+        </div>
+    </div>
     
     <script>
         const options = [
@@ -603,6 +767,8 @@
         ];
         
         let currentOption = null;
+        let selectedForComparison = new Set();
+        const MAX_COMPARISON = 5;
         
         // Draw the flowchart
         function drawFlowchart() {
@@ -646,6 +812,45 @@
                     text.textContent = line;
                     g.appendChild(text);
                 });
+                
+                // Add comparison checkbox (except for center node)
+                if (option.type !== 'center') {
+                    // Create checkbox group
+                    const checkboxGroup = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+                    checkboxGroup.setAttribute('class', 'compare-checkbox');
+                    checkboxGroup.setAttribute('data-id', option.id);
+                    
+                    // Calculate position at 7-8 o'clock (lower left)
+                    // 7:30 position is at approximately 225 degrees (or -135 degrees from 12 o'clock)
+                    const radius = option.type === 'center' ? 35 : 30;
+                    const angle = (7.5 / 12) * 2 * Math.PI; // 7.5 hours in radians
+                    const checkboxDistance = radius + 0; // Touching the circle (no gap)
+                    const centerX = option.x + Math.sin(angle) * checkboxDistance;
+                    const centerY = option.y - Math.cos(angle) * checkboxDistance;
+                    
+                    // Triangle background (pointing radially outward from circle)
+                    // 33% smaller: 14 * 0.67 = 9.38
+                    const triangle = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                    const size = 9.4;
+                    // Points: top, bottom-left, bottom-right (before rotation)
+                    const points = `${centerX},${centerY - size} ${centerX - size},${centerY + size/2} ${centerX + size},${centerY + size/2}`;
+                    triangle.setAttribute('points', points);
+                    triangle.setAttribute('fill', 'white');
+                    triangle.setAttribute('stroke', '#7c3aed');
+                    triangle.setAttribute('stroke-width', '3');
+                    // Rotate triangle 225 degrees (7:30 position) to point outward from circle
+                    triangle.setAttribute('transform', `rotate(225 ${centerX} ${centerY})`);
+                    checkboxGroup.appendChild(triangle);
+                    
+                    // Add click handler
+                    checkboxGroup.style.cursor = 'pointer';
+                    checkboxGroup.addEventListener('click', (e) => {
+                        e.stopPropagation();
+                        toggleComparison(option.id);
+                    });
+                    
+                    g.appendChild(checkboxGroup);
+                }
                 
                 g.addEventListener('click', () => openPanel(option.id));
                 svg.appendChild(g);
@@ -11925,6 +12130,168 @@
                 }
             }
         });
+        
+        // Comparison Functions
+        function toggleComparison(optionId) {
+            if (selectedForComparison.has(optionId)) {
+                selectedForComparison.delete(optionId);
+            } else {
+                if (selectedForComparison.size >= MAX_COMPARISON) {
+                    alert(`You can only compare up to ${MAX_COMPARISON} businesses at once.`);
+                    return;
+                }
+                selectedForComparison.add(optionId);
+            }
+            updateCompareUI();
+        }
+        
+        function updateCompareUI() {
+            // Update checkboxes
+            document.querySelectorAll('.compare-checkbox').forEach(checkbox => {
+                const id = checkbox.getAttribute('data-id');
+                if (selectedForComparison.has(id)) {
+                    checkbox.classList.add('selected');
+                } else {
+                    checkbox.classList.remove('selected');
+                }
+            });
+            
+            // Update controls
+            const count = selectedForComparison.size;
+            const controls = document.getElementById('compareControls');
+            const countEl = document.getElementById('compareCount');
+            
+            if (count >= 2) {
+                controls.classList.add('show');
+                countEl.textContent = `${count} selected`;
+            } else {
+                controls.classList.remove('show');
+            }
+        }
+        
+        function clearSelection() {
+            selectedForComparison.clear();
+            updateCompareUI();
+        }
+        
+        function showComparison() {
+            if (selectedForComparison.size < 2) {
+                alert('Please select at least 2 businesses to compare.');
+                return;
+            }
+            
+            generateComparisonReport();
+            document.getElementById('comparisonPanel').classList.add('open');
+        }
+        
+        function closeComparison() {
+            document.getElementById('comparisonPanel').classList.remove('open');
+        }
+        
+        function generateComparisonReport() {
+            const selectedOptions = Array.from(selectedForComparison).map(id => {
+                const option = options.find(o => o.id === id);
+                const metrics = getMetricsForOption(id);
+                return { id, option, metrics };
+            }).filter(item => item.metrics); // Only include items with metrics
+            
+            if (selectedOptions.length === 0) {
+                document.getElementById('comparisonTableContainer').innerHTML = '<p>No metrics available for selected businesses.</p>';
+                return;
+            }
+            
+            // Update title
+            const names = selectedOptions.map(item => item.option.label.replace(/\n/g, ' ')).join(' vs ');
+            document.getElementById('comparisonTitle').textContent = `Comparing: ${names}`;
+            
+            // Build comparison table
+            let tableHTML = '<table class="comparison-table"><thead><tr>';
+            tableHTML += '<th class="metric-row-label">Metric</th>';
+            selectedOptions.forEach(item => {
+                tableHTML += `<th>${item.option.label.replace(/\n/g, '<br>')}</th>`;
+            });
+            tableHTML += '</tr></thead><tbody>';
+            
+            // Get all unique metric labels
+            const metricLabels = selectedOptions[0].metrics.map(m => m.label);
+            
+            // For each metric, create a row
+            metricLabels.forEach(label => {
+                tableHTML += '<tr>';
+                tableHTML += `<td class="metric-row-label">${label}</td>`;
+                
+                const values = selectedOptions.map(item => {
+                    const metric = item.metrics.find(m => m.label === label);
+                    return metric ? metric.value : 'N/A';
+                });
+                
+                // Highlight best value if it's a numeric comparison
+                const bestIndex = findBestValueIndex(label, values);
+                
+                values.forEach((value, index) => {
+                    const isBest = bestIndex !== -1 && index === bestIndex;
+                    tableHTML += `<td${isBest ? ' class="best-value"' : ''}>${value}</td>`;
+                });
+                
+                tableHTML += '</tr>';
+            });
+            
+            tableHTML += '</tbody></table>';
+            
+            document.getElementById('comparisonTableContainer').innerHTML = tableHTML;
+        }
+        
+        function findBestValueIndex(metricLabel, values) {
+            // Determine which value is "best" based on metric type
+            const lowerIsBetter = [
+                'Initial Investment',
+                'Time to First Revenue',
+                'Time to Target Income',
+                'Competition Level'
+            ];
+            
+            const higherIsBetter = [
+                'Gross Profit Margin',
+                'Operating Margin',
+                'Year 2 Profit',
+                'ROI',
+                'Demand Level'
+            ];
+            
+            if (!lowerIsBetter.includes(metricLabel) && !higherIsBetter.includes(metricLabel)) {
+                return -1; // Don't highlight if we can't determine what's best
+            }
+            
+            // Extract numeric values
+            const numericValues = values.map(v => {
+                if (v === 'N/A') return null;
+                // Remove $, %, commas, and extract first number
+                const match = v.replace(/[$,%,]/g, '').match(/[\d.]+/);
+                return match ? parseFloat(match[0]) : null;
+            });
+            
+            // Find best
+            let bestIndex = -1;
+            let bestValue = null;
+            
+            numericValues.forEach((val, index) => {
+                if (val === null) return;
+                
+                if (bestValue === null) {
+                    bestValue = val;
+                    bestIndex = index;
+                } else {
+                    const isBetter = lowerIsBetter.includes(metricLabel) ? 
+                        (val < bestValue) : (val > bestValue);
+                    if (isBetter) {
+                        bestValue = val;
+                        bestIndex = index;
+                    }
+                }
+            });
+            
+            return bestIndex;
+        }
     </script>
 </body>
 </html>
